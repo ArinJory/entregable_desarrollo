@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clasificador de Triángulos</title>
+    <style>
+      body {
+        background-color: deeppink;
+        font-family: Arial, sans-serif;
+        color: white;
+      }
+      #clearButton {
+        margin-top: 20px;
+        font-size: 16px;
+        padding: 10px;
+      }
+      #resultDiv {
+        margin-top: 20px;
+        font-size: 20px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ml5@0.12.2/dist/ml5.min.js"></script>
+
+    <script>
+      let shapeClassifier;
+      let canvas;
+      let resultDiv;
+      let inputImage;
+      let clearButton;
+      let isClassifying = false;
+
+      function setup() {
+        canvas = createCanvas(400, 400);
+        background(255);
+
+        let options = {
+          inputs: [64, 64, 3],
+          task: "imageClassification",
+        };
+        shapeClassifier = ml5.neuralNetwork(options);
+
+        const modelDetails = {
+          model: './model/model.json',
+          metadata: './model/model_meta.json',
+          weights: './model/model.weights.bin',
+        };
+
+        clearButton = createButton('Limpiar');
+        clearButton.position(10, height + 10);
+        clearButton.id("clearButton");
+        clearButton.mousePressed(() => {
+          background(255);
+          resultDiv.html('Dibuja un triángulo para identificarlo...');
+        });
+
+        resultDiv = createDiv('Cargando modelo...');
+        resultDiv.id("resultDiv");
+        resultDiv.position(10, height + 50);
+
+        inputImage = createGraphics(64, 64);
+        shapeClassifier.load(modelDetails, modelLoaded);
+      }
+
+      function modelLoaded() {
+        console.log("Modelo cargado");
+        resultDiv.html('Dibuja un triángulo para identificarlo...');
+        classifyImage();
+      }
+
+      function classifyImage() {
+        if (isClassifying) return;
+        isClassifying = true;
+
+        inputImage.copy(canvas, 0, 0, 400, 400, 0, 0, 64, 64);
+
+        inputImage.loadPixels();
+        for (let i = 0; i < inputImage.pixels.length; i += 4) {
+          let r = inputImage.pixels[i];
+          let g = inputImage.pixels[i + 1];
+          let b = inputImage.pixels[i + 2];
+          inputImage.pixels[i] = r;
+          inputImage.pixels[i + 1] = g;
+          inputImage.pixels[i + 2] = b;
+        }
+        inputImage.updatePixels();
+
+        shapeClassifier.classify({ image: inputImage }, goResults);
+
+        setTimeout(() => {
+          isClassifying = false;
+        }, 500);
+      }
+
+      function goResults(err, result) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+
+        let etiqueta = result[0].label;
+        let confianza = result[0].confidence;
+
+        let descripcion = {
+            rectangulo_A: "Triángulo rectángulo base abajo",
+            rectangulo_B: "Triángulo rectángulo base arriba",
+            rectangulo_C: "Triángulo rectángulo inclinado izquierdo",
+            rectangulo_D: "Triángulo rectángulo inclinado derecho",
+            Obtus_ngulo: "Triángulo obtusángulo"
+};
+
+
+        let texto = descripcion[etiqueta] || etiqueta;
+
+        resultDiv.html(`Etiqueta: ${etiqueta}<br>${texto}<br>Confianza: ${nf(confianza, 1, 2)}`);
+
+        classifyImage();
+      }
+
+      function draw() {
+        if (mouseIsPressed) {
+          stroke(0);
+          strokeWeight(8);
+          line(mouseX, mouseY, pmouseX, pmouseY);
+        }
+      }
+    </script>
+  </body>
+</html>
